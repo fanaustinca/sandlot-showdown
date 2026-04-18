@@ -1,0 +1,164 @@
+:host {
+  display: block;
+  min-height: 100%;
+}
+
+.menu {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  color: #f3f4f6;
+  text-align: center;
+}
+
+h1 {
+  font-size: 2.6rem;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  color: #9ca3af;
+  margin-bottom: 2.5rem;
+}
+
+.mode-grid,
+.multi-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.mode-card {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 16px;
+  padding: 1.75rem 1.25rem;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: #3b82f6;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+
+  h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.35rem;
+  }
+
+  p {
+    margin: 0;
+    color: #9ca3af;
+    font-size: 0.95rem;
+  }
+}
+
+.rules {
+  text-align: left;
+  background: #0b1220;
+  border: 1px solid #1f2937;
+  padding: 1.25rem 1.5rem;
+  border-radius: 12px;
+  margin-top: 2rem;
+
+  h3 {
+    margin-top: 0;
+  }
+
+  ul {
+    line-height: 1.6;
+    padding-left: 1.1rem;
+  }
+
+  kbd {
+    background: #1f2937;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    padding: 0 0.35rem;
+    font-size: 0.85rem;
+  }
+}
+
+.waiting {
+  padding: 2rem;
+  background: #0b1220;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+}
+
+.code-big {
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  padding: 1rem 0;
+  color: #f59e0b;
+}
+
+.hint {
+  color: #9ca3af;
+}
+
+.join {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 16px;
+  padding: 1.75rem 1.25rem;
+
+  input {
+    background: #0b1220;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    color: inherit;
+    font-size: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    text-align: center;
+  }
+
+  button {
+    background: #3b82f6;
+    color: white;
+    border: 0;
+    border-radius: 8px;
+    padding: 0.85rem;
+    font-size: 1.05rem;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+.err {
+  color: #ef4444;
+  margin-top: 1rem;
+}
+
+.back {
+  margin-top: 2rem;
+  background: transparent;
+  border: 1px solid #374151;
+  color: #9ca3af;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+
+  &:hover {
+    color: #f3f4f6;
+  }
+}

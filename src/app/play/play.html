@@ -1,0 +1,103 @@
+<div class="play">
+  <header class="bar">
+    <button class="exit" (click)="exit()">← Exit</button>
+    <div class="score">
+      <div class="team">
+        <span class="name">{{ roleLabel('p1') }} (P1)</span>
+        <span class="num">{{ state().p1Score }}</span>
+      </div>
+      <div class="inning">
+        <div>Inning {{ state().inning }} / {{ MAX_INNINGS }}</div>
+        <div class="half">{{ state().top ? 'Top' : 'Bottom' }}</div>
+      </div>
+      <div class="team">
+        <span class="name">{{ roleLabel('p2') }} (P2)</span>
+        <span class="num">{{ state().p2Score }}</span>
+      </div>
+    </div>
+    <div class="atbat">
+      <span>Outs: {{ state().half.strikeouts }}</span>
+      <span>Strikes: {{ state().half.strikes }}</span>
+      <span>Runs: {{ state().half.runs }}</span>
+    </div>
+  </header>
+
+  <section class="field" (click)="onTapField()">
+    <div class="mound">
+      <div class="player pitcher">
+        <div class="emoji">🧢</div>
+        <div class="label">Pitcher ({{ roleLabel(currentPitcherPid()) }})</div>
+      </div>
+    </div>
+
+    <div class="bases">
+      <div class="base second" [class.on]="basesArr[1]"></div>
+      <div class="base third" [class.on]="basesArr[2]"></div>
+      <div class="base first" [class.on]="basesArr[0]"></div>
+      <div class="base home"></div>
+    </div>
+
+    @if (activePitch()) {
+      <div
+        class="ball"
+        [style.left.%]="ballPos().x"
+        [style.top.%]="ballPos().y"
+        [style.transform]="'translate(-50%, -50%) scale(' + ballPos().scale + ')'"
+      >⚾</div>
+    }
+
+    <div class="plate">
+      <div class="player batter">
+        <div class="emoji">🏏</div>
+        <div class="label">Batter ({{ roleLabel(currentBatter()) }})</div>
+      </div>
+    </div>
+
+    @if (banner()) {
+      <div class="banner" [class.hit]="lastResult()?.quality !== 'strike'">
+        {{ banner() }}
+      </div>
+    }
+  </section>
+
+  <footer class="controls">
+    @if (phase() === 'selecting_pitch' && myTurnAsPitcher()) {
+      <div class="pitch-picker">
+        <p class="prompt">Pick your pitch:</p>
+        <div class="pitches">
+          @for (p of pitchTypes; track p) {
+            <button (click)="selectPitch(p)">
+              <span class="icon">
+                @switch (p) {
+                  @case ('straight') { ➡️ }
+                  @case ('curl') { 🌀 }
+                  @case ('zigzag') { ⚡ }
+                  @case ('flyball') { 🎯 }
+                }
+              </span>
+              <span class="name">{{ p }}</span>
+            </button>
+          }
+        </div>
+      </div>
+    } @else if (phase() === 'selecting_pitch' && !myTurnAsPitcher()) {
+      <p class="prompt waiting">Waiting for pitcher…</p>
+    } @else if (phase() === 'pitching' && myTurnAsBatter()) {
+      <p class="prompt big">Press <kbd>SPACE</kbd> or tap to swing!</p>
+    } @else if (phase() === 'pitching' && !myTurnAsBatter()) {
+      <p class="prompt">Watching the pitch…</p>
+    } @else if (phase() === 'game_over') {
+      <div class="gameover">
+        <h2>
+          @if (state().winner === 'tie') { It's a tie! }
+          @else if (state().winner) { {{ roleLabel(state().winner!) }} wins! }
+        </h2>
+        <p>Final: {{ state().p1Score }} – {{ state().p2Score }}</p>
+        @if (mode() === 'single') {
+          <button (click)="playAgain()">Play Again</button>
+        }
+        <button (click)="exit()">Main Menu</button>
+      </div>
+    }
+  </footer>
+</div>

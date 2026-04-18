@@ -1,0 +1,85 @@
+@if (view() === 'home') {
+  <div class="menu">
+    <h1>⚾ Sandlot Showdown</h1>
+    <p class="tagline">A pitch-and-swing baseball game</p>
+
+    <div class="mode-grid">
+      <button class="mode-card" (click)="view.set('single')">
+        <h2>Single Player</h2>
+        <p>Face off against the computer.</p>
+      </button>
+      <button class="mode-card" (click)="view.set('multi')">
+        <h2>Multiplayer</h2>
+        <p>Create a room or join a friend.</p>
+      </button>
+    </div>
+
+    <div class="rules">
+      <h3>How to play</h3>
+      <ul>
+        <li>Pitcher picks: straight, curl, zigzag, or flyball.</li>
+        <li>Batter presses <kbd>Space</kbd> or taps to swing.</li>
+        <li>Swing timing determines the hit quality (HR → single → strike).</li>
+        <li>0.5s cooldown between swings.</li>
+        <li>Half-inning ends at 3 strikeouts or 5 runs. 6 innings total.</li>
+      </ul>
+    </div>
+  </div>
+}
+
+@if (view() === 'single') {
+  <div class="menu">
+    <h1>Single Player</h1>
+    <p>Choose your role. The computer will play the other.</p>
+    <div class="mode-grid">
+      <button class="mode-card" (click)="chooseSingle('p1')">
+        <h2>Be the Batter</h2>
+        <p>Read the pitch, time the swing.</p>
+      </button>
+      <button class="mode-card" (click)="chooseSingle('p2')">
+        <h2>Be the Pitcher</h2>
+        <p>Outsmart the computer batter.</p>
+      </button>
+    </div>
+    <button class="back" (click)="back()">← Back</button>
+  </div>
+}
+
+@if (view() === 'multi') {
+  <div class="menu">
+    <h1>Multiplayer</h1>
+    <p>Create a room for your friend, or join with a code.</p>
+
+    @if (ws.code() && !ws.peerPresent()) {
+      <div class="waiting">
+        <p>Share this code with your friend:</p>
+        <div class="code-big">{{ ws.code() }}</div>
+        <p class="hint">Waiting for them to join…</p>
+      </div>
+    } @else {
+      <div class="multi-actions">
+        <button class="mode-card" (click)="createRoom()" [disabled]="connecting()">
+          <h2>Create Room</h2>
+          <p>Generate a code for a friend.</p>
+        </button>
+        <div class="join">
+          <input
+            placeholder="ROOM CODE"
+            [value]="joinCode()"
+            (input)="joinCode.set($any($event.target).value)"
+            maxlength="6"
+          />
+          <button (click)="joinRoom()" [disabled]="connecting() || !joinCode().trim()">
+            Join
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (connectError()) {
+      <p class="err">{{ connectError() }}</p>
+    }
+
+    <button class="back" (click)="back()">← Back</button>
+  </div>
+}
