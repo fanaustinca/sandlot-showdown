@@ -12,6 +12,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import * as THREE from 'three';
 import {
+  Bases,
   GameState,
   HitQuality,
   MAX_INNINGS,
@@ -52,8 +53,46 @@ interface LastResult {
   basesAdvanced: number;
 }
 
+interface RunnerAnimEntry {
+  group: THREE.Group;
+  waypoints: THREE.Vector3[];
+  durationPerBase: number;
+  scored: boolean;
+}
+
+interface PostHitAnim {
+  startTime: number;
+  quality: HitQuality;
+  ballTo: THREE.Vector3;
+  ballFlightMs: number;
+  chaserIdx: number;
+  chaserFrom: THREE.Vector3;
+  chaserReachMs: number;
+  throwTo: THREE.Vector3;
+  throwDuration: number;
+  runners: RunnerAnimEntry[];
+  totalDuration: number;
+}
+
 const RELEASE_POS = new THREE.Vector3(0, 2.4, -16);
 const PLATE_POS = new THREE.Vector3(0, 1.3, 0.2);
+
+const BASE_POS = [
+  new THREE.Vector3(1.4, 0.05, 0.9),
+  new THREE.Vector3(8.5, 0.05, -7),
+  new THREE.Vector3(0, 0.05, -15.5),
+  new THREE.Vector3(-8.5, 0.05, -7),
+];
+
+const FIELDER_HOME = [
+  new THREE.Vector3(10, 0.05, -8),
+  new THREE.Vector3(3, 0.05, -13),
+  new THREE.Vector3(-3, 0.05, -13),
+  new THREE.Vector3(-10, 0.05, -8),
+  new THREE.Vector3(-18, 0.05, -28),
+  new THREE.Vector3(0, 0.05, -32),
+  new THREE.Vector3(18, 0.05, -28),
+];
 
 @Component({
   selector: 'app-play',
@@ -108,10 +147,17 @@ export class PlayComponent implements AfterViewInit {
   private ball!: THREE.Mesh;
   private pitcherGroup!: THREE.Group;
   private batterGroup!: THREE.Group;
+  private batMesh!: THREE.Mesh;
+  private fielderGroups: THREE.Group[] = [];
+  private runnerPool: THREE.Group[] = [];
   private rafId: number | null = null;
   private resizeObs: ResizeObserver | null = null;
   private offWs: (() => void) | null = null;
   private innerTimeouts: number[] = [];
+
+  private swingStart: number | null = null;
+  private swingResetId: number | null = null;
+  private postHit: PostHitAnim | null = null;
 
   constructor() {
     this.route.queryParams.subscribe((params) => {
@@ -133,6 +179,7 @@ export class PlayComponent implements AfterViewInit {
     this.destroyRef.onDestroy(() => {
       if (this.rafId) cancelAnimationFrame(this.rafId);
       this.innerTimeouts.forEach((t) => clearTimeout(t));
+      if (this.swingResetId) clearTimeout(this.swingResetId);
       if (this.offWs) this.offWs();
       if (this.resizeObs) this.resizeObs.disconnect();
       if (this.renderer) {
@@ -146,6 +193,7 @@ export class PlayComponent implements AfterViewInit {
   ngAfterViewInit() {
     this.initScene();
     this.startRenderLoop();
+    this.updateBaseRunners();
   }
 
   private initScene() {
@@ -270,11 +318,26 @@ export class PlayComponent implements AfterViewInit {
     this.scene.add(this.batterGroup);
 
     const batMat = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
-    const bat = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.4, 8), batMat);
-    bat.position.set(-0.45, 2.0, 0.1);
-    bat.rotation.z = Math.PI / 3;
-    bat.castShadow = true;
-    this.batterGroup.add(bat);
+    this.batMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.4, 8), batMat);
+    this.batMesh.position.set(-0.45, 2.0, 0.1);
+    this.batMesh.rotation.z = Math.PI / 3;
+    this.batMesh.castShadow = true;
+    this.batterGroup.add(this.batMesh);
+
+    for (const pos of FIELDER_HOME) {
+      const f = this.buildFigure(0x1d4ed8, 0xf1c27d);
+      f.position.copy(pos);
+      f.rotation.y = Math.atan2(-pos.x, 0.5 - pos.z);
+      this.scene.add(f);
+      this.fielderGroups.push(f);
+    }
+
+    for (let i = 0; i < 4; i++) {
+      const r = this.buildFigure(0xdc2626, 0xf1c27d);
+      r.visible = false;
+      this.scene.add(r);
+      this.runnerPool.push(r);
+    }
   }
 
   private buildFigure(shirtColor: number, skinColor: number): THREE.Group {
@@ -333,32 +396,130 @@ export class PlayComponent implements AfterViewInit {
 
   private startRenderLoop() {
     const loop = () => {
+      this.tickSwing();
       this.tickBall();
+      this.tickPostHit();
       this.renderer.render(this.scene, this.camera);
       this.rafId = requestAnimationFrame(loop);
     };
     this.rafId = requestAnimationFrame(loop);
   }
 
+  private tickSwing() {
+    if (this.swingStart === null) return;
+    const elapsed = performance.now() - this.swingStart;
+    const dur = 250;
+    const t = Math.min(1, elapsed / dur);
+    const ease = 1 - (1 - t) * (1 - t);
+    this.batMesh.rotation.z = Math.PI / 3 + (-Math.PI / 2 - Math.PI / 3) * ease;
+
+    if (t >= 1 && this.swingResetId === null) {
+      this.swingResetId = window.setTimeout(() => {
+        this.batMesh.rotation.z = Math.PI / 3;
+        this.swingStart = null;
+        this.swingResetId = null;
+      }, 400);
+      this.innerTimeouts.push(this.swingResetId);
+    }
+  }
+
   private tickBall() {
     const p = this.activePitch();
-    if (!p || this.phase() !== 'pitching') {
-      this.ball.visible = false;
+    if (p && this.phase() === 'pitching') {
+      const t = performance.now() - p.t0;
+      const progress = Math.min(1, t / p.flightMs);
+      const pos = this.computeBallPos(p, progress);
+      this.ball.position.copy(pos);
+      this.ball.visible = true;
+
+      if (t >= p.flightMs && p.swungAt === null) {
+        if (this.mode() === 'multi') {
+          if (this.myTurnAsBatter()) {
+            this.ws.send({ type: 'miss', pitchType: p.type });
+          }
+        } else {
+          this.finishMiss(p.type);
+        }
+      }
       return;
     }
-    const t = performance.now() - p.t0;
-    const progress = Math.min(1, t / p.flightMs);
-    const pos = this.computeBallPos(p, progress);
-    this.ball.position.copy(pos);
-    this.ball.visible = true;
 
-    if (t >= p.flightMs && p.swungAt === null) {
-      if (this.mode() === 'multi') {
-        if (this.myTurnAsBatter()) {
-          this.ws.send({ type: 'miss', pitchType: p.type });
+    if (this.postHit) {
+      const a = this.postHit;
+      const elapsed = performance.now() - a.startTime;
+
+      if (elapsed < a.ballFlightMs) {
+        const t = elapsed / a.ballFlightMs;
+        const x = PLATE_POS.x + (a.ballTo.x - PLATE_POS.x) * t;
+        const z = PLATE_POS.z + (a.ballTo.z - PLATE_POS.z) * t;
+        let arc: number;
+        switch (a.quality) {
+          case 'single': arc = 4; break;
+          case 'double': arc = 7; break;
+          case 'triple': arc = 10; break;
+          case 'home_run': arc = 14; break;
+          default: arc = 0;
+        }
+        const y = PLATE_POS.y + (a.ballTo.y - PLATE_POS.y) * t + arc * Math.sin(t * Math.PI);
+        this.ball.position.set(x, y, z);
+        this.ball.visible = true;
+      } else if (a.quality === 'home_run') {
+        this.ball.visible = false;
+      } else if (elapsed < a.chaserReachMs) {
+        this.ball.position.copy(a.ballTo);
+        this.ball.visible = true;
+      } else if (elapsed < a.chaserReachMs + a.throwDuration) {
+        const tt = (elapsed - a.chaserReachMs) / a.throwDuration;
+        const x = a.ballTo.x + (a.throwTo.x - a.ballTo.x) * tt;
+        const z = a.ballTo.z + (a.throwTo.z - a.ballTo.z) * tt;
+        const y = a.ballTo.y + (a.throwTo.y - a.ballTo.y) * tt + 2 * Math.sin(tt * Math.PI);
+        this.ball.position.set(x, y, z);
+        this.ball.visible = true;
+      } else {
+        this.ball.visible = false;
+      }
+      return;
+    }
+
+    this.ball.visible = false;
+  }
+
+  private tickPostHit() {
+    if (!this.postHit) return;
+    const a = this.postHit;
+    const elapsed = performance.now() - a.startTime;
+
+    for (const r of a.runners) {
+      const segs = r.waypoints.length - 1;
+      if (segs <= 0) continue;
+      const total = segs * r.durationPerBase;
+      const t = Math.min(1, elapsed / total);
+      const seg = Math.min(Math.floor(t * segs), segs - 1);
+      const segT = t * segs - seg;
+      r.group.position.lerpVectors(r.waypoints[seg], r.waypoints[Math.min(seg + 1, segs)], segT);
+      r.group.visible = !(r.scored && t >= 1);
+      if (seg < segs) {
+        const dx = r.waypoints[seg + 1].x - r.waypoints[seg].x;
+        const dz = r.waypoints[seg + 1].z - r.waypoints[seg].z;
+        r.group.rotation.y = Math.atan2(dx, dz);
+      }
+    }
+
+    if (a.quality !== 'home_run') {
+      const chaser = this.fielderGroups[a.chaserIdx];
+      if (elapsed < a.chaserReachMs) {
+        const t = Math.min(1, elapsed / a.chaserReachMs);
+        chaser.position.lerpVectors(a.chaserFrom, a.ballTo, t);
+        const dx = a.ballTo.x - chaser.position.x;
+        const dz = a.ballTo.z - chaser.position.z;
+        if (Math.abs(dx) + Math.abs(dz) > 0.1) {
+          chaser.rotation.y = Math.atan2(dx, dz);
         }
       } else {
-        this.finishMiss(p.type);
+        chaser.position.copy(a.ballTo);
+        const dx = a.throwTo.x - a.ballTo.x;
+        const dz = a.throwTo.z - a.ballTo.z;
+        chaser.rotation.y = Math.atan2(dx, dz);
       }
     }
   }
@@ -390,6 +551,140 @@ export class PlayComponent implements AfterViewInit {
       }
     }
     return new THREE.Vector3(x, y, z);
+  }
+
+  private startPostHitAnim(outcome: SwingOutcome, oldBases: Bases, seed: number) {
+    const quality = outcome.quality;
+    const advance = outcome.basesAdvanced;
+
+    const ballTo = this.computeLandingPos(quality, seed);
+    let ballFlightMs: number;
+    switch (quality) {
+      case 'single': ballFlightMs = 700; break;
+      case 'double': ballFlightMs = 900; break;
+      case 'triple': ballFlightMs = 1100; break;
+      case 'home_run': ballFlightMs = 1400; break;
+      default: ballFlightMs = 700;
+    }
+
+    const chaserIdx = this.findNearestFielder(ballTo);
+    const chaserFrom = FIELDER_HOME[chaserIdx].clone();
+    const chaserDist = chaserFrom.distanceTo(ballTo);
+    const chaserRunMs = (chaserDist / 12) * 1000;
+    const chaserReachMs = Math.max(ballFlightMs, chaserRunMs);
+
+    const throwTo = new THREE.Vector3(0, 1.5, -15);
+    const throwDuration = 450;
+
+    const runners: RunnerAnimEntry[] = [];
+    let poolIdx = 0;
+    const occ = [oldBases.first, oldBases.second, oldBases.third];
+
+    for (let i = 2; i >= 0; i--) {
+      if (!occ[i]) continue;
+      const fromBase = i + 1;
+      const toBase = fromBase + advance;
+      const wp: THREE.Vector3[] = [];
+      for (let b = fromBase; b <= Math.min(toBase, 4); b++) {
+        wp.push(BASE_POS[b % 4].clone());
+      }
+      runners.push({
+        group: this.runnerPool[poolIdx++],
+        waypoints: wp,
+        durationPerBase: 500,
+        scored: toBase >= 4,
+      });
+    }
+
+    if (advance > 0) {
+      const wp: THREE.Vector3[] = [];
+      for (let b = 0; b <= Math.min(advance, 4); b++) {
+        wp.push(BASE_POS[b % 4].clone());
+      }
+      runners.push({
+        group: this.runnerPool[poolIdx++],
+        waypoints: wp,
+        durationPerBase: 500,
+        scored: advance >= 4,
+      });
+      this.batterGroup.visible = false;
+    }
+
+    for (const r of runners) {
+      r.group.visible = true;
+      r.group.position.copy(r.waypoints[0]);
+    }
+    for (let i = poolIdx; i < 4; i++) {
+      this.runnerPool[i].visible = false;
+    }
+
+    const maxRunMs = runners.reduce((m, r) => Math.max(m, (r.waypoints.length - 1) * r.durationPerBase), 0);
+    let totalDuration: number;
+    if (quality === 'home_run') {
+      totalDuration = Math.max(ballFlightMs, maxRunMs) + 500;
+    } else {
+      totalDuration = Math.max(chaserReachMs + throwDuration + 300, maxRunMs + 300);
+    }
+
+    this.postHit = {
+      startTime: performance.now(),
+      quality,
+      ballTo,
+      ballFlightMs,
+      chaserIdx,
+      chaserFrom,
+      chaserReachMs,
+      throwTo,
+      throwDuration,
+      runners,
+      totalDuration,
+    };
+  }
+
+  private computeLandingPos(quality: HitQuality, seed: number): THREE.Vector3 {
+    const range = 70;
+    const angle = ((seed % range) - range / 2) * Math.PI / 180;
+    let dist: number;
+    switch (quality) {
+      case 'single': dist = 11 + (seed % 6); break;
+      case 'double': dist = 20 + (seed % 6); break;
+      case 'triple': dist = 28 + (seed % 5); break;
+      case 'home_run': dist = 36 + (seed % 5); break;
+      default: dist = 0;
+    }
+    return new THREE.Vector3(Math.sin(angle) * dist, 0.2, -Math.cos(angle) * dist);
+  }
+
+  private findNearestFielder(target: THREE.Vector3): number {
+    let min = Infinity;
+    let idx = 0;
+    for (let i = 0; i < FIELDER_HOME.length; i++) {
+      const d = FIELDER_HOME[i].distanceTo(target);
+      if (d < min) { min = d; idx = i; }
+    }
+    return idx;
+  }
+
+  private resetFielderPositions() {
+    for (let i = 0; i < this.fielderGroups.length; i++) {
+      this.fielderGroups[i].position.copy(FIELDER_HOME[i]);
+      this.fielderGroups[i].rotation.y = Math.atan2(-FIELDER_HOME[i].x, 0.5 - FIELDER_HOME[i].z);
+    }
+  }
+
+  private updateBaseRunners() {
+    const bases = this.state().half.bases;
+    const occ = [bases.first, bases.second, bases.third];
+    for (let i = 0; i < 3; i++) {
+      if (occ[i]) {
+        this.runnerPool[i].visible = true;
+        this.runnerPool[i].position.copy(BASE_POS[i + 1]);
+      } else {
+        this.runnerPool[i].visible = false;
+      }
+    }
+    this.runnerPool[3].visible = false;
+    this.batterGroup.visible = true;
   }
 
   private attachWs() {
@@ -480,6 +775,8 @@ export class PlayComponent implements AfterViewInit {
     const offsetMs = swingDt - p.contactMs;
     this.activePitch.set({ ...p, swungAt: now });
 
+    this.swingStart = now;
+
     if (this.mode() === 'multi' && this.myTurnAsBatter()) {
       this.ws.send({ type: 'swing', offsetMs, pitchType: p.type });
     } else {
@@ -490,16 +787,18 @@ export class PlayComponent implements AfterViewInit {
   private finishSwing(offsetMs: number, pitchType: PitchType) {
     const cur = this.state();
     const { state: next, outcome } = applySwing(cur, offsetMs, pitchType);
-    this.afterResolution(next, outcome, cur.half.batter);
+    this.afterResolution(next, outcome, cur.half.batter, cur.half.bases);
   }
 
   private finishMiss(pitchType: PitchType) {
     const cur = this.state();
     const { state: next, outcome } = applySwing(cur, 9999, pitchType);
-    this.afterResolution(next, outcome, cur.half.batter);
+    this.afterResolution(next, outcome, cur.half.batter, cur.half.bases);
   }
 
-  private afterResolution(next: GameState, outcome: SwingOutcome, batter: PlayerId) {
+  private afterResolution(next: GameState, outcome: SwingOutcome, batter: PlayerId, oldBases: Bases) {
+    const seed = this.activePitch()?.seed ?? Math.floor(Math.random() * 1e9);
+
     this.state.set(next);
     this.lastResult.set({
       quality: outcome.quality,
@@ -511,8 +810,20 @@ export class PlayComponent implements AfterViewInit {
     this.phase.set('swing_resolved');
     this.activePitch.set(null);
 
-    const breakMs = outcome.quality === 'strike' ? 1000 : 1700;
+    let breakMs: number;
+    if (outcome.quality === 'strike') {
+      breakMs = 1000;
+      this.updateBaseRunners();
+    } else {
+      this.startPostHitAnim(outcome, oldBases, seed);
+      breakMs = this.postHit!.totalDuration + 300;
+    }
+
     const id = window.setTimeout(() => {
+      this.postHit = null;
+      this.resetFielderPositions();
+      this.updateBaseRunners();
+
       if (next.gameOver) {
         this.phase.set('game_over');
         return;
@@ -551,6 +862,11 @@ export class PlayComponent implements AfterViewInit {
     this.state.set(newGameState());
     this.lastResult.set(null);
     this.banner.set(null);
+    this.postHit = null;
+    this.swingStart = null;
+    this.batMesh.rotation.z = Math.PI / 3;
+    this.resetFielderPositions();
+    this.updateBaseRunners();
     this.phase.set('selecting_pitch');
     this.scheduleNextTick();
   }
