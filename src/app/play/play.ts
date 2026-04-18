@@ -141,6 +141,16 @@ export class PlayComponent implements AfterViewInit {
     return s.half.batter === this.ws.role();
   });
 
+  readonly displayP1Score = computed(() => {
+    const s = this.state();
+    return s.p1Score + (s.half.batter === 'p1' ? s.half.runs : 0);
+  });
+
+  readonly displayP2Score = computed(() => {
+    const s = this.state();
+    return s.p2Score + (s.half.batter === 'p2' ? s.half.runs : 0);
+  });
+
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
@@ -535,8 +545,9 @@ export class PlayComponent implements AfterViewInit {
       case 'straight':
         break;
       case 'curl': {
-        const amt = Math.sin(progress * Math.PI) * 2.6 * p.curlSign;
-        x += amt;
+        const t2 = progress * progress;
+        x += t2 * 3.5 * p.curlSign;
+        y -= t2 * 0.8;
         break;
       }
       case 'zigzag': {

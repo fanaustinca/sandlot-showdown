@@ -4,7 +4,7 @@
     <div class="score">
       <div class="team">
         <span class="name">{{ roleLabel('p1') }} (P1)</span>
-        <span class="num">{{ state().p1Score }}</span>
+        <span class="num">{{ displayP1Score() }}</span>
       </div>
       <div class="inning">
         <div>Inning {{ state().inning }} / {{ MAX_INNINGS }}</div>
@@ -12,7 +12,7 @@
       </div>
       <div class="team">
         <span class="name">{{ roleLabel('p2') }} (P2)</span>
-        <span class="num">{{ state().p2Score }}</span>
+        <span class="num">{{ displayP2Score() }}</span>
       </div>
     </div>
     <div class="atbat">
@@ -75,7 +75,7 @@
           @if (state().winner === 'tie') { It's a tie! }
           @else if (state().winner) { {{ roleLabel(state().winner!) }} wins! }
         </h2>
-        <p>Final: {{ state().p1Score }} – {{ state().p2Score }}</p>
+        <p>Final: {{ displayP1Score() }} – {{ displayP2Score() }}</p>
         @if (mode() === 'single') {
           <button (click)="playAgain()">Play Again</button>
         }
