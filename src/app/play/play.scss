@@ -19,6 +19,7 @@
   gap: 0.5rem;
   background: #0b1220;
   border-bottom: 1px solid #1f2937;
+  z-index: 2;
 }
 
 .score {
@@ -85,113 +86,85 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at 50% 65%, #166534 0%, #14532d 60%, #052e16 100%);
   border-bottom: 1px solid #1f2937;
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.mound {
+.scene {
   position: absolute;
-  left: 50%;
-  top: 8%;
-  transform: translateX(-50%);
-  width: 90px;
-  height: 60px;
-  background: radial-gradient(ellipse, #a16207, #713f12);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+  inset: 0;
 
-.plate {
-  position: absolute;
-  left: 50%;
-  top: 84%;
-  transform: translateX(-50%);
-  width: 70px;
-  height: 40px;
-  background: #f3f4f6;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.player {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-
-  .emoji {
-    font-size: 2rem;
+  :global(canvas) {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
   }
-  .label {
+}
+
+.bases-overlay {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  width: 90px;
+  height: 90px;
+  pointer-events: none;
+
+  .base {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.35);
+    border: 1.5px solid rgba(255, 255, 255, 0.65);
+    transform: rotate(45deg);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+
+    &.on {
+      background: #ef4444;
+      box-shadow: 0 0 10px #ef4444;
+    }
+  }
+
+  .base.first  { right: 0;   top: 50%;  transform: translateY(-50%) rotate(45deg); }
+  .base.second { left: 50%;  top: 0;    transform: translateX(-50%) rotate(45deg); }
+  .base.third  { left: 0;    top: 50%;  transform: translateY(-50%) rotate(45deg); }
+}
+
+.labels-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  .lbl {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.45);
     color: #fef3c7;
     font-size: 0.75rem;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 0 0.4rem;
+    padding: 0.15rem 0.5rem;
     border-radius: 4px;
     white-space: nowrap;
   }
-}
 
-.mound .player { top: 50%; transform: translateY(-50%); }
-.plate .player { bottom: 100%; margin-bottom: 4px; }
-
-.bases {
-  position: absolute;
-  left: 50%;
-  top: 40%;
-  transform: translateX(-50%);
-  width: 220px;
-  height: 220px;
-}
-
-.base {
-  position: absolute;
-  width: 22px;
-  height: 22px;
-  background: #fff;
-  transform: rotate(45deg);
-  border: 2px solid #d1d5db;
-  transition: background 0.2s ease;
-
-  &.on {
-    background: #ef4444;
-    box-shadow: 0 0 12px #ef4444;
+  .pitcher-lbl {
+    top: 22%;
+    left: 50%;
+    transform: translateX(-50%);
   }
-}
 
-.base.first { right: 0; top: 50%; }
-.base.second { left: 50%; top: 0; transform: translateX(-50%) rotate(45deg); }
-.base.third { left: 0; top: 50%; }
-.base.home {
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%) rotate(45deg);
-  background: #fbbf24;
-  border-color: #f59e0b;
-}
-
-.ball {
-  position: absolute;
-  font-size: 2rem;
-  pointer-events: none;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-  will-change: left, top, transform;
+  .batter-lbl {
+    bottom: 12%;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 
 .banner {
   position: absolute;
-  top: 45%;
+  top: 42%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(17, 24, 39, 0.9);
+  background: rgba(17, 24, 39, 0.92);
   color: #fbbf24;
   font-size: 2.5rem;
   font-weight: 800;
@@ -313,4 +286,5 @@
   .score .team .num { font-size: 1.4rem; }
   .banner { font-size: 1.75rem; padding: 0.75rem 1.25rem; }
   .pitches button .name { font-size: 0.75rem; }
+  .bases-overlay { width: 70px; height: 70px; }
 }

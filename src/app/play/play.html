@@ -23,34 +23,17 @@
   </header>
 
   <section class="field" (click)="onTapField()">
-    <div class="mound">
-      <div class="player pitcher">
-        <div class="emoji">🧢</div>
-        <div class="label">Pitcher ({{ roleLabel(currentPitcherPid()) }})</div>
-      </div>
-    </div>
+    <div class="scene" #scene></div>
 
-    <div class="bases">
+    <div class="bases-overlay">
       <div class="base second" [class.on]="basesArr[1]"></div>
       <div class="base third" [class.on]="basesArr[2]"></div>
       <div class="base first" [class.on]="basesArr[0]"></div>
-      <div class="base home"></div>
     </div>
 
-    @if (activePitch()) {
-      <div
-        class="ball"
-        [style.left.%]="ballPos().x"
-        [style.top.%]="ballPos().y"
-        [style.transform]="'translate(-50%, -50%) scale(' + ballPos().scale + ')'"
-      >⚾</div>
-    }
-
-    <div class="plate">
-      <div class="player batter">
-        <div class="emoji">🏏</div>
-        <div class="label">Batter ({{ roleLabel(currentBatter()) }})</div>
-      </div>
+    <div class="labels-overlay">
+      <div class="lbl pitcher-lbl">Pitcher: {{ roleLabel(currentPitcherPid()) }}</div>
+      <div class="lbl batter-lbl">Batter: {{ roleLabel(currentBatter()) }}</div>
     </div>
 
     @if (banner()) {
