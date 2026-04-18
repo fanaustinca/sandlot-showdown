@@ -157,6 +157,7 @@ export class PlayComponent implements AfterViewInit {
   private ball!: THREE.Mesh;
   private pitcherGroup!: THREE.Group;
   private batterGroup!: THREE.Group;
+  private batPivot!: THREE.Group;
   private batMesh!: THREE.Mesh;
   private fielderGroups: THREE.Group[] = [];
   private runnerPool: THREE.Group[] = [];
@@ -217,8 +218,8 @@ export class PlayComponent implements AfterViewInit {
     this.scene.fog = new THREE.Fog(0x87ceeb, 40, 90);
 
     this.camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 200);
-    this.camera.position.set(0, 3.6, 3.5);
-    this.camera.lookAt(0, 2.2, -14);
+    this.camera.position.set(0, 4.2, 5.5);
+    this.camera.lookAt(0, 1.8, -14);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -327,12 +328,17 @@ export class PlayComponent implements AfterViewInit {
     this.batterGroup.rotation.y = Math.PI;
     this.scene.add(this.batterGroup);
 
+    this.batPivot = new THREE.Group();
+    this.batPivot.position.set(0, 1.7, 0.1);
+    this.batPivot.rotation.y = 0.6;
+    this.batterGroup.add(this.batPivot);
+
     const batMat = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
     this.batMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.4, 8), batMat);
-    this.batMesh.position.set(-0.45, 2.0, 0.1);
-    this.batMesh.rotation.z = Math.PI / 3;
+    this.batMesh.rotation.z = -Math.PI / 2 + Math.PI / 8;
+    this.batMesh.position.set(-0.7, 0.25, 0);
     this.batMesh.castShadow = true;
-    this.batterGroup.add(this.batMesh);
+    this.batPivot.add(this.batMesh);
 
     for (const pos of FIELDER_HOME) {
       const f = this.buildFigure(0x1d4ed8, 0xf1c27d);
@@ -421,11 +427,11 @@ export class PlayComponent implements AfterViewInit {
     const dur = 250;
     const t = Math.min(1, elapsed / dur);
     const ease = 1 - (1 - t) * (1 - t);
-    this.batMesh.rotation.z = Math.PI / 3 + (-Math.PI / 2 - Math.PI / 3) * ease;
+    this.batPivot.rotation.y = 0.6 + (-2.4 - 0.6) * ease;
 
     if (t >= 1 && this.swingResetId === null) {
       this.swingResetId = window.setTimeout(() => {
-        this.batMesh.rotation.z = Math.PI / 3;
+        this.batPivot.rotation.y = 0.6;
         this.swingStart = null;
         this.swingResetId = null;
       }, 400);
@@ -877,7 +883,7 @@ export class PlayComponent implements AfterViewInit {
     this.banner.set(null);
     this.postHit = null;
     this.swingStart = null;
-    this.batMesh.rotation.z = Math.PI / 3;
+    this.batPivot.rotation.y = 0.6;
     this.resetFielderPositions();
     this.updateBaseRunners();
     this.phase.set('selecting_pitch');
