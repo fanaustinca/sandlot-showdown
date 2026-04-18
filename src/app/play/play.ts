@@ -545,9 +545,11 @@ export class PlayComponent implements AfterViewInit {
       case 'straight':
         break;
       case 'curl': {
-        const t2 = progress * progress;
-        x += t2 * 3.5 * p.curlSign;
-        y -= t2 * 0.8;
+        const radius = 1.8 * (1 - progress * 0.3);
+        const revolutions = 3;
+        const angle = progress * revolutions * Math.PI * 2 * p.curlSign;
+        x += Math.sin(angle) * radius;
+        y += Math.cos(angle) * radius * 0.6;
         break;
       }
       case 'zigzag': {
